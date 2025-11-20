@@ -1,6 +1,6 @@
-import { fetchFromApi, fetchFromApiSafe } from "@/lib/api";
-import type { Project, TestRun } from "@/types";
-import { AiTestTabs } from "@/components/ai-test/ai-test-tabs";
+import { ManualTestTabs } from "@/components/manual-test/manual-test-tabs";
+import { fetchFromApi } from "@/lib/api";
+import type { Project } from "@/types";
 
 export const dynamic = "force-dynamic";
 
@@ -24,12 +24,12 @@ function createPlaceholderProject(projectId: string, fallback?: SearchParams): P
       return projectId;
     }
   })();
-  
+
   const name = normalizeParam(fallback?.name);
   const product = normalizeParam(fallback?.product);
   const platform = normalizeParam(fallback?.platform) as Project["platform"] | undefined;
   const bundleId = normalizeParam(fallback?.bundleId);
-  
+
   return {
     id: projectId,
     name: name || decoded,
@@ -42,15 +42,14 @@ function createPlaceholderProject(projectId: string, fallback?: SearchParams): P
 
 async function getProjectById(projectId: string): Promise<Project | null> {
   try {
-    const projects = await fetchFromApi<Project[]>("/projects");
-    return projects.find(p => p.id === projectId) || null;
+    return await fetchFromApi<Project>(`/projects/${projectId}`);
   } catch (error) {
-    console.warn("프로젝트 조회 실패:", error);
+    console.warn("[manual-test] 프로젝트 조회 실패:", error);
     return null;
   }
 }
 
-export default async function AiTestProjectPage({
+export default async function ManualTestProjectPage({
   params,
   searchParams
 }: {
@@ -59,7 +58,7 @@ export default async function AiTestProjectPage({
 }) {
   const resolvedParams = await params;
   const resolvedSearchParams = await searchParams;
-  
+
   if (!resolvedParams?.projectId) {
     return (
       <div style={{ padding: 24 }}>
@@ -68,39 +67,8 @@ export default async function AiTestProjectPage({
       </div>
     );
   }
-  
-  let project: Project | null = null;
-  let runs: TestRun[] = [];
-  
-  try {
-    project = await getProjectById(resolvedParams.projectId);
-  } catch (error) {
-    console.warn("프로젝트 조회 실패:", error);
-  }
-  
-  try {
-    runs = await fetchFromApi<TestRun[]>("/test-runs");
-  } catch (error) {
-    console.warn("테스트 실행 목록 조회 실패:", error);
-  }
-  
-  const resolvedProject = project ?? createPlaceholderProject(resolvedParams.projectId, resolvedSearchParams);
-  
-  const projectRuns = runs
-    .filter(run => run.projectId === resolvedProject.id)
-    .map(run => ({
-      ...run,
-      steps: run.steps ?? []
-    }));
 
-  const summary = {
-    total: projectRuns.length,
-    successRate: projectRuns.length 
-      ? Math.round((projectRuns.filter(run => run.status === "정상").length / projectRuns.length) * 100)
-      : 0,
-    success: projectRuns.filter(run => run.status === "정상").length,
-    fail: projectRuns.filter(run => run.status !== "정상" && run.status !== "대기").length
-  };
+  const project = (await getProjectById(resolvedParams.projectId)) ?? createPlaceholderProject(resolvedParams.projectId, resolvedSearchParams);
 
   const displayProjectId = (() => {
     try {
@@ -113,19 +81,17 @@ export default async function AiTestProjectPage({
   return (
     <>
       <nav style={{ fontSize: 14, color: "var(--text-muted)" }}>
-        AI 테스트 &gt; <span style={{ color: "var(--text-strong)" }}>{resolvedProject.name || displayProjectId}</span>
+        매뉴얼 테스트 &gt; <span style={{ color: "var(--text-strong)" }}>{project.name || displayProjectId}</span>
       </nav>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 24 }}>
         <div>
-          <h1 style={{ fontSize: 28, fontWeight: 800 }}>{resolvedProject.name}</h1>
+          <h1 style={{ fontSize: 28, fontWeight: 800 }}>{project.name}</h1>
           <p style={{ color: "var(--text-muted)", marginTop: 4 }}>
-            {resolvedProject.product || "제품 미지정"} · {(resolvedProject.platform || "web").toUpperCase()}
+            {project.product || "제품 미지정"} · {(project.platform || "web").toUpperCase()}
           </p>
         </div>
       </div>
-      <AiTestTabs
-        project={resolvedProject}
-      />
+      <ManualTestTabs project={project} />
     </>
   );
 }

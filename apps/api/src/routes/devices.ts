@@ -208,5 +208,32 @@ router.post("/:deviceId/action", async (req, res) => {
   }
 });
 
+// QR 테스트를 위한 QR 코드 이미지 전송 및 카메라 제어 엔드포인트
+router.post("/:deviceId/qr-scan", async (req, res) => {
+  const { deviceId } = req.params;
+  const devices = await getUsbDevices();
+  const target = devices.find(device => device.id === deviceId);
+  
+  if (!target) {
+    return res.status(404).json({ message: "디바이스를 찾을 수 없습니다." });
+  }
+
+  if (target.connection !== "usb") {
+    return res.status(400).json({ message: "USB로 연결된 디바이스만 QR 테스트를 수행할 수 있습니다." });
+  }
+
+  // TODO: QR 코드 이미지를 디바이스에 전송하고 카메라 앱을 열어 촬영하도록 지시
+  // 현재는 기본 응답만 반환
+  // 실제 구현 시:
+  // 1. QR 코드 이미지를 디바이스에 전송
+  // 2. MATE 앱 카메라 열기
+  // 3. QR 코드 촬영 대기
+  
+  res.json({ 
+    success: true, 
+    message: "QR 코드 전송 완료. 카메라에서 촬영해주세요." 
+  });
+});
+
 export default router;
 

@@ -187,3 +187,41 @@ export interface AiTestResult {
   screenshots: AiResultScreenshot[];
 }
 
+export interface ManualTestSession {
+  id: string;
+  projectId?: string;
+  title: string;
+  description?: string;
+  status: "running" | "completed";
+  startedAt: string;
+  endedAt?: string;
+  lastMessageAt?: string;
+}
+
+export interface ManualChatMessage {
+  id: string;
+  sessionId: string;
+  role: "user" | "assistant";
+  content: string;
+  createdAt: string;
+}
+
+export type ManualVerificationResult = "P" | "F" | "NT" | "N";
+
+export interface ManualTestCase {
+  id: string;
+  sessionId: string;
+  title: string;
+  objective?: string;
+  preconditions?: string;
+  steps?: string[];
+  expectedResult?: string;
+  notes?: string;
+  aiSummary?: string;
+  verificationResult?: ManualVerificationResult;
+  btsId?: string;
+  reporterNote?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+

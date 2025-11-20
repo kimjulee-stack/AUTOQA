@@ -37,6 +37,7 @@ export function AiTestTabs({ project }: AiTestTabsProps) {
   const [deletingResultId, setDeletingResultId] = useState<string | null>(null);
   const [isExecutingAction, setIsExecutingAction] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+const [screenshotOrientationMap, setScreenshotOrientationMap] = useState<Record<string, "landscape" | "portrait">>({});
 
   const tabs: Tab[] = ["테스트 실행", "실행 결과"];
   const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:4000";
@@ -212,6 +213,55 @@ export function AiTestTabs({ project }: AiTestTabsProps) {
       setResultMessages([]);
     }
   }, [selectedResultId, loadResultDetail]);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const defaultOrientation: "landscape" | "portrait" = "portrait";
+
+    const loadOrientations = async () => {
+      const entries = await Promise.all(
+        resultScreenshots.map(screenshot => {
+          return new Promise<{ id: string; orientation: "landscape" | "portrait" }>(resolve => {
+            if (!screenshot.imageUrl) {
+              resolve({ id: screenshot.id, orientation: defaultOrientation });
+              return;
+            }
+
+            const img = new window.Image();
+            img.onload = () => {
+              const orientation = img.naturalWidth >= img.naturalHeight ? "landscape" : "portrait";
+              resolve({ id: screenshot.id, orientation });
+            };
+            img.onerror = () => resolve({ id: screenshot.id, orientation: defaultOrientation });
+            img.src = screenshot.imageUrl;
+          });
+        })
+      );
+
+      if (!cancelled) {
+        const next: Record<string, "landscape" | "portrait"> = {};
+        entries.forEach(entry => {
+          next[entry.id] = entry.orientation;
+        });
+        setScreenshotOrientationMap(next);
+      }
+    };
+
+    if (resultScreenshots.length > 0) {
+      loadOrientations();
+    } else {
+      setScreenshotOrientationMap({});
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [resultScreenshots]);
 
   const handleStartSession = async () => {
     if (isStartingSession) return;
@@ -670,57 +720,68 @@ export function AiTestTabs({ project }: AiTestTabsProps) {
                     ) : (
                       <div
                         style={{
-                          display: "grid",
-                          gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))",
+                          display: "flex",
+                          flexWrap: "wrap",
                           gap: 16
                         }}
                       >
-                        {resultScreenshots.map(screenshot => (
-                          <div
-                            key={screenshot.id}
-                            style={{
-                              border: "1px solid var(--border)",
-                              borderRadius: 12,
-                              overflow: "hidden",
-                              background: "#fff",
-                              display: "flex",
-                              flexDirection: "column"
-                            }}
-                          >
+                        {resultScreenshots.map(screenshot => {
+                          const orientation = screenshotOrientationMap[screenshot.id] ?? "portrait";
+                          const aspectRatio = orientation === "landscape" ? "16/9" : "9/16";
+                          const flexBasis = orientation === "landscape" ? "calc(50% - 16px)" : "calc(25% - 16px)";
+                          const minWidth = orientation === "landscape" ? 280 : 180;
+
+                          return (
                             <div
+                              key={screenshot.id}
                               style={{
-                                position: "relative",
-                                width: "100%",
-                                aspectRatio: "9/16",
-                                background: "#000",
-                                cursor: "pointer"
+                                flex: `1 1 ${flexBasis}`,
+                                minWidth,
+                                maxWidth: flexBasis,
+                                border: "1px solid var(--border)",
+                                borderRadius: 12,
+                                overflow: "hidden",
+                                background: "#fff",
+                                display: "flex",
+                                flexDirection: "column",
+                                boxSizing: "border-box"
                               }}
-                              onClick={() => window.open(screenshot.imageUrl, "_blank")}
                             >
-                              <Image src={screenshot.imageUrl} alt="실행 결과 스크린샷" fill style={{ objectFit: "contain" }} unoptimized />
-                            </div>
-                            <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
-                              <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                                {new Date(screenshot.capturedAt).toLocaleString("ko-KR", { hour12: false })}
-                              </p>
-                              <button
-                                onClick={() => window.open(screenshot.imageUrl, "_blank")}
+                              <div
                                 style={{
+                                  position: "relative",
                                   width: "100%",
-                                  padding: "8px 12px",
-                                  border: "1px solid var(--border)",
-                                  borderRadius: 8,
-                                  background: "#fff",
-                                  cursor: "pointer",
-                                  fontSize: 13,
-                                  fontWeight: 600
+                                  aspectRatio,
+                                  background: "#000",
+                                  cursor: "pointer"
                                 }}
+                                onClick={() => window.open(screenshot.imageUrl, "_blank")}
                               >
-                                크게 보기
-                              </button>
+                                <Image src={screenshot.imageUrl} alt="실행 결과 스크린샷" fill style={{ objectFit: "contain" }} unoptimized />
+                              </div>
+                              <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
+                                <p style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                                  {new Date(screenshot.capturedAt).toLocaleString("ko-KR", { hour12: false })}
+                                </p>
+                                <button
+                                  onClick={() => window.open(screenshot.imageUrl, "_blank")}
+                                  style={{
+                                    width: "100%",
+                                    padding: "8px 12px",
+                                    border: "1px solid var(--border)",
+                                    borderRadius: 8,
+                                    background: "#fff",
+                                    cursor: "pointer",
+                                    fontSize: 13,
+                                    fontWeight: 600
+                                  }}
+                                >
+                                  크게 보기
+                                </button>
+                              </div>
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })}
                       </div>
                     )}
                   </div>

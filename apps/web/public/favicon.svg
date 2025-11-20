@@ -3,9 +3,9 @@
   <text x="16" y="22" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="url(#paint0_linear)" text-anchor="middle">A</text>
   <defs>
     <linearGradient id="paint0_linear" x1="8" y1="16" x2="24" y2="16" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#5AD1FF" />
-      <stop offset="0.5" stop-color="#7D7BFF" />
-      <stop offset="1" stop-color="#FF81C0" />
+      <stop stop-color="#FFE066" />
+      <stop offset="0.5" stop-color="#FFD23C" />
+      <stop offset="1" stop-color="#FFC300" />
     </linearGradient>
   </defs>
 </svg>

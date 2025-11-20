@@ -8,9 +8,12 @@ const GEMINI_MODEL = process.env.GEMINI_MODEL ?? "gemini-1.5-flash";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-async function logChatMessage(sessionId: string, role: "user" | "assistant", content: string) {
+type ChatMode = "ai" | "manual";
+
+async function logChatMessage(mode: ChatMode, sessionId: string, role: "user" | "assistant", content: string) {
   try {
-    await fetch(`${API_BASE_URL}/ai-test-sessions/${sessionId}/messages`, {
+    const basePath = mode === "manual" ? "manual-test-sessions" : "ai-test-sessions";
+    await fetch(`${API_BASE_URL}/${basePath}/${sessionId}/messages`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json"
@@ -25,7 +28,8 @@ async function logChatMessage(sessionId: string, role: "user" | "assistant", con
 function buildUserPrompt(
   systemInstruction: string,
   allMessages: Array<{ role: string; content: string }>,
-  latestUserMessage: string
+  latestUserMessage: string,
+  mode: ChatMode
 ) {
   // 최근 메시지만 사용하여 컨텍스트 길이 제한 (최근 10개 메시지)
   const recentMessages = allMessages.slice(-10);
@@ -39,12 +43,17 @@ function buildUserPrompt(
     })
     .join("\n");
 
+  const suffix =
+    mode === "manual"
+      ? "위 요구사항을 기반으로 매뉴얼 테스트 케이스를 구조화해 주세요."
+      : "위 스크린샷을 참고하여 UI 깨짐, 정렬 문제, 버튼 노출 여부 등을 분석하고 필요한 경우 액션 JSON을 포함해 응답하세요.";
+
   return `${systemInstruction}
 
 ${historyText ? `이전 대화:\n${historyText}\n\n` : ""}최신 사용자 요청:
 ${latestUserMessage}
 
-위 스크린샷을 참고하여 UI 깨짐, 정렬 문제, 버튼 노출 여부 등을 분석하고 필요한 경우 액션 JSON을 포함해 응답하세요.`;
+${suffix}`;
 }
 
 function extractMessageText(content: unknown): string {
@@ -89,13 +98,9 @@ export async function POST(request: NextRequest) {
   let messages: Array<{ role: string; content: string }>;
   let latestUserMessage: string;
   let screenshot: { base64: string; mediaType: string } | null;
+  let mode: ChatMode = "ai";
 
-  // Body 읽기 시도
-  // Next.js 16에서는 bodyUsed를 확인할 수 없으므로, 
-  // clone()을 먼저 시도하고 실패하면 원본을 사용합니다.
-  let body: any;
-  
-  // bodyUsed 확인 (가능한 경우)
+  // Body를 문자열로 한 번만 읽은 뒤 JSON으로 파싱
   const bodyUsed = (request as any).bodyUsed;
   if (bodyUsed === true) {
     console.error("[AI Chat] Request body가 이미 사용되었습니다.");
@@ -105,56 +110,30 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  let rawBody = "";
   try {
-    // 먼저 clone()을 시도하여 body를 복제한 후 읽기
-    // 이렇게 하면 원본 request가 이미 읽혔더라도 문제가 없습니다
-    const clonedRequest = request.clone();
-    body = await clonedRequest.json();
-  } catch (cloneError: any) {
-    // clone()이 실패하면 원본 request를 직접 읽기 시도
-    try {
-      body = await request.json();
-    } catch (readError: any) {
-      // Body가 이미 읽혔거나 손상된 경우
-      const errorMessage = readError?.message || cloneError?.message || "알 수 없는 오류";
-      if (errorMessage.includes("already been read") || 
-          errorMessage.includes("Body is unusable") ||
-          errorMessage.includes("bodyUsed")) {
-        console.error("[AI Chat] Request body가 이미 읽혔습니다:", {
-          cloneError: cloneError?.message,
-          readError: readError?.message,
-          bodyUsed: bodyUsed
-        });
-        return NextResponse.json(
-          { error: "요청 본문을 읽을 수 없습니다. Next.js의 내부 동작으로 인해 body가 이미 읽혔을 수 있습니다. 페이지를 새로고침하고 다시 시도해주세요." },
-          { status: 400 }
-        );
-      }
-      console.error("[AI Chat] Request body 읽기 실패:", {
-        cloneError: cloneError?.message,
-        readError: readError?.message
-      });
-      return NextResponse.json(
-        { error: "요청 본문을 읽을 수 없습니다." },
-        { status: 400 }
-      );
-    }
+    rawBody = await request.text();
+  } catch (error) {
+    console.error("[AI Chat] Request body 텍스트 변환 실패:", error);
+    return NextResponse.json({ error: "요청 본문을 읽을 수 없습니다." }, { status: 400 });
   }
 
-  // 읽은 데이터를 즉시 변수에 저장 (body 변수는 이후 사용하지 않음)
+  if (!rawBody) {
+    return NextResponse.json({ error: "요청 본문이 비어있습니다." }, { status: 400 });
+  }
+
   try {
-    projectId = body.projectId;
-    projectName = body.projectName;
-    sessionId = body.sessionId;
-    messages = body.messages;
-    latestUserMessage = body.latestUserMessage;
-    screenshot = body.screenshot || null;
+    const parsed = JSON.parse(rawBody);
+    projectId = parsed.projectId;
+    projectName = parsed.projectName;
+    sessionId = parsed.sessionId;
+    messages = parsed.messages;
+    latestUserMessage = parsed.latestUserMessage;
+    screenshot = parsed.screenshot || null;
+    mode = parsed.mode === "manual" ? "manual" : "ai";
   } catch (error) {
-    console.error("[AI Chat] Body 데이터 파싱 실패:", error);
-    return NextResponse.json(
-      { error: "요청 데이터 형식이 올바르지 않습니다." },
-      { status: 400 }
-    );
+    console.error("[AI Chat] Body 데이터 파싱 실패:", error, rawBody);
+    return NextResponse.json({ error: "요청 데이터 형식이 올바르지 않습니다." }, { status: 400 });
   }
 
   try {
@@ -187,7 +166,31 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const systemInstruction = `당신은 ${projectName || "프로젝트"}의 AI 테스트 어시스턴트입니다.
+    const systemInstruction =
+      mode === "manual"
+        ? `당신은 ${projectName || "프로젝트"}의 QA 분석가입니다.
+
+사용자가 제공한 기획 의도를 바탕으로 테스트 케이스를 작성하세요.
+
+출력 형식:
+\`\`\`json
+[
+  {
+    "title": "테스트 시나리오 이름",
+    "objective": "테스트 목적 및 기획 의도",
+    "preconditions": "사전 조건",
+    "steps": ["1. ...", "2. ..."],
+    "expectedResult": "기대 결과"
+  }
+]
+\`\`\`
+
+규칙:
+- 반드시 한국어로 작성
+- steps는 배열로 제공
+- 표나 불릿 대신 JSON 코드블록으로만 테스트 케이스를 제공
+- 케이스는 최소 3개 이상 제안`
+        : `당신은 ${projectName || "프로젝트"}의 AI 테스트 어시스턴트입니다.
 
 **앱 제어 기능**
 스크린샷을 분석 후 앱을 제어할 수 있습니다. 액션은 JSON 형식으로 응답하세요:
@@ -205,15 +208,12 @@ export async function POST(request: NextRequest) {
 
 응답은 한국어로 작성하세요.`;
 
-    const conversationPrompt = buildUserPrompt(systemInstruction, messages, latestUserMessage);
+    const conversationPrompt = buildUserPrompt(systemInstruction, messages, latestUserMessage, mode);
 
     // Gemini API 요청 형식 구성
-    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [
-      { text: conversationPrompt }
-    ];
+    const parts: Array<{ text?: string; inlineData?: { mimeType: string; data: string } }> = [{ text: conversationPrompt }];
 
-    // 이미지가 있으면 추가
-    if (screenshot?.base64) {
+    if (mode === "ai" && screenshot?.base64) {
       const mediaType = screenshot.mediaType || "image/png";
       parts.push({
         inlineData: {
@@ -245,7 +245,7 @@ export async function POST(request: NextRequest) {
       hasImage: !!screenshot?.base64
     });
 
-    logChatMessage(sessionId, "user", latestUserMessage).catch(() => {});
+    logChatMessage(mode, sessionId, "user", latestUserMessage).catch(() => {});
 
     // Rate limit 오류 발생 시 재시도 로직
     let lastError: any = null;
@@ -396,7 +396,7 @@ export async function POST(request: NextRequest) {
       throw new Error("Gemini API가 빈 응답을 반환했습니다.");
     }
 
-    logChatMessage(sessionId, "assistant", message).catch(() => {});
+    logChatMessage(mode, sessionId, "assistant", message).catch(() => {});
 
     console.log("[AI Chat] Gemini API 응답 성공");
 

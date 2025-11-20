@@ -1,0 +1,29 @@
+[build]
+  # Next.js 빌드 출력 디렉토리
+  publish = "apps/web/.next"
+  # Netlify Functions 디렉토리
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+
+# API 라우팅 - /api/* 요청을 Netlify Function으로 전달
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api"
+  status = 200
+  force = true
+
+# Next.js 정적 파일 서빙
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+
+# Functions 설정
+[functions]
+  # 타임아웃 설정 (초)
+  timeout = 30
+  # 메모리 설정 (MB)
+  memory = 1024
+

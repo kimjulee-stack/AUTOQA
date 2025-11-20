@@ -58,11 +58,15 @@ export function CreateProjectDialog({ trigger, project, onSuccess }: Props) {
   const [deviceApps, setDeviceApps] = useState<DeviceApp[]>([]);
   const [isAppLoading, setIsAppLoading] = useState(false);
 
+  const router = useRouter();
+  const pathname = usePathname();
+  const isManualPage = pathname?.startsWith("/manual-test") ?? false;
+
   const [form, setForm] = useState({
     id: "",
     name: "",
     product: productOptions[0],
-    subCategory: "",
+    subCategory: isManualPage ? "manual" : "",
     platform: "android",
     bundleId: "",
     deviceId: ""
@@ -75,7 +79,7 @@ export function CreateProjectDialog({ trigger, project, onSuccess }: Props) {
         id: project.id,
         name: project.name,
         product: project.product,
-        subCategory: "",
+        subCategory: project.subCategory ?? "",
         platform: project.platform,
         bundleId: project.bundleId ?? "",
         deviceId: project.deviceId ?? ""
@@ -85,17 +89,15 @@ export function CreateProjectDialog({ trigger, project, onSuccess }: Props) {
         id: "",
         name: "",
         product: productOptions[0],
-        subCategory: "",
+        subCategory: isManualPage ? "manual" : "",
         platform: "android",
         bundleId: "",
         deviceId: ""
       });
     }
-  }, [open, project]);
+  }, [open, project, isManualPage]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
-  const router = useRouter();
-  const pathname = usePathname();
 
   const selectedApp = useMemo(() => deviceApps.find(app => app.packageId === form.bundleId), [deviceApps, form.bundleId]);
 

@@ -11,7 +11,8 @@ const createProjectSchema = z.object({
   product: z.string().min(2),
   platform: z.enum(["android", "ios", "web"]),
   bundleId: z.string().optional(),
-  deviceId: z.string().optional()
+  deviceId: z.string().optional(),
+  subCategory: z.string().optional()
 });
 
 router.get("/", (_req, res) => {

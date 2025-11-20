@@ -274,10 +274,9 @@ function ScreenshotGallery({ projectRuns, selectedRunId, product }: ScreenshotGa
   const [enlargedImage, setEnlargedImage] = useState<string | null>(null);
   const [enlargedImageInfo, setEnlargedImageInfo] = useState<{ name: string; stepIndex: number; runId: string } | null>(null);
   
-  // 태블릿 학습 제품들은 가로 모드로 표시
+  // 태블릿 학습 제품들은 기본적으로 가로 모드
   const isTabletProduct = product === "뇌새김" || product === "브레인키" || product === "톡이즈" || product === "톡이즈 보카";
-  const aspectRatio = isTabletProduct ? "16/9" : "9/16";
-  const gridColumns = isTabletProduct ? "repeat(2, 1fr)" : "repeat(auto-fill, minmax(280px, 1fr))";
+  const defaultOrientation: "landscape" | "portrait" = isTabletProduct ? "landscape" : "portrait";
   
   const targetRuns = useMemo(() => {
     if (selectedRunId) {
@@ -311,6 +310,54 @@ function ScreenshotGallery({ projectRuns, selectedRunId, product }: ScreenshotGa
 
     return screenshots;
   }, [targetRuns]);
+
+  const [orientationMap, setOrientationMap] = useState<Record<string, "landscape" | "portrait">>({});
+
+  useEffect(() => {
+    let cancelled = false;
+
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const loadOrientations = async () => {
+      const entries = await Promise.all(
+        allScreenshots.map((item, idx) => {
+          const key = `${item.runId}-${item.step.id}-${idx}`;
+          const src = item.step.screenshotUrl;
+
+          return new Promise<{ key: string; orientation: "landscape" | "portrait" }>(resolve => {
+            if (!src) {
+              resolve({ key, orientation: defaultOrientation });
+              return;
+            }
+
+            const img = new window.Image();
+            img.onload = () => {
+              const orientation = img.naturalWidth >= img.naturalHeight ? "landscape" : "portrait";
+              resolve({ key, orientation });
+            };
+            img.onerror = () => resolve({ key, orientation: defaultOrientation });
+            img.src = src;
+          });
+        })
+      );
+
+      if (!cancelled) {
+        const next: Record<string, "landscape" | "portrait"> = {};
+        entries.forEach(entry => {
+          next[entry.key] = entry.orientation;
+        });
+        setOrientationMap(next);
+      }
+    };
+
+    loadOrientations();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [allScreenshots, defaultOrientation]);
 
   const handleImageClick = (screenshotUrl: string, stepName: string, stepIndex: number, runId: string) => {
     setEnlargedImage(screenshotUrl);
@@ -372,72 +419,84 @@ function ScreenshotGallery({ projectRuns, selectedRunId, product }: ScreenshotGa
       </header>
       <div
         style={{
-          display: "grid",
-          gridTemplateColumns: gridColumns,
+          display: "flex",
+          flexWrap: "wrap",
           gap: 16,
         }}
       >
-        {allScreenshots.map((item, idx) => (
-          <div
-            key={`${item.runId}-${item.step.id}-${idx}`}
-            style={{
-              border: "1px solid var(--border)",
-              borderRadius: 12,
-              overflow: "hidden",
-              background: "#fff",
-            }}
-          >
-            <div 
-              style={{ 
-                position: "relative", 
-                width: "100%", 
-                aspectRatio, 
-                background: "#000",
-                cursor: "pointer"
+        {allScreenshots.map((item, idx) => {
+          const key = `${item.runId}-${item.step.id}-${idx}`;
+          const orientation = orientationMap[key] ?? defaultOrientation;
+          const aspectRatio = orientation === "landscape" ? "16/9" : "9/16";
+          const flexBasis = orientation === "landscape" ? "calc(50% - 16px)" : "calc(25% - 16px)";
+          const minWidth = orientation === "landscape" ? 280 : 180;
+
+          return (
+            <div
+              key={key}
+              style={{
+                flex: `1 1 ${flexBasis}`,
+                minWidth,
+                maxWidth: flexBasis,
+                border: "1px solid var(--border)",
+                borderRadius: 12,
+                overflow: "hidden",
+                background: "#fff",
+                boxSizing: "border-box"
               }}
-              onClick={() => handleImageClick(item.step.screenshotUrl || "", item.step.name, item.stepIndex, item.runId)}
             >
-              <Image
-                src={item.step.screenshotUrl || "/assets/screenshots/sample.png"}
-                alt={`Step ${item.stepIndex} screenshot`}
-                fill
-                style={{ objectFit: "contain" }}
-                unoptimized
-              />
-            </div>
-            <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
-                Step {item.stepIndex} · {new Date(item.step.endedAt || item.step.startedAt).toLocaleTimeString("ko-KR", { hour12: false })}
-              </div>
-              <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{item.step.name}</div>
-              <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
-                <div>실행 ID: {item.runId}</div>
-                <div style={{ marginTop: 2 }}>
-                  상태: <span style={{ color: item.step.status === "정상" ? "#22c55e" : "#ef4444" }}>{item.step.status}</span>
-                </div>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDownload(item.step.screenshotUrl || "", item.step.name, item.stepIndex);
+              <div 
+                style={{ 
+                  position: "relative", 
+                  width: "100%", 
+                  aspectRatio, 
+                  background: "#000",
+                  cursor: "pointer"
                 }}
-                style={{
-                  width: "100%",
-                  padding: "8px 12px",
-                  border: "1px solid var(--border)",
-                  borderRadius: 8,
-                  background: "#fff",
-                  cursor: "pointer",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  color: "var(--text-strong)"
-                }}
+                onClick={() => handleImageClick(item.step.screenshotUrl || "", item.step.name, item.stepIndex, item.runId)}
               >
-                다운로드
-              </button>
+                <Image
+                  src={item.step.screenshotUrl || "/assets/screenshots/sample.png"}
+                  alt={`Step ${item.stepIndex} screenshot`}
+                  fill
+                  style={{ objectFit: "contain" }}
+                  unoptimized
+                />
+              </div>
+              <div style={{ padding: 12, borderTop: "1px solid var(--border)" }}>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 4 }}>
+                  Step {item.stepIndex} · {new Date(item.step.endedAt || item.step.startedAt).toLocaleTimeString("ko-KR", { hour12: false })}
+                </div>
+                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 4 }}>{item.step.name}</div>
+                <div style={{ fontSize: 12, color: "var(--text-muted)", marginBottom: 8 }}>
+                  <div>실행 ID: {item.runId}</div>
+                  <div style={{ marginTop: 2 }}>
+                    상태: <span style={{ color: item.step.status === "정상" ? "#22c55e" : "#ef4444" }}>{item.step.status}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownload(item.step.screenshotUrl || "", item.step.name, item.stepIndex);
+                  }}
+                  style={{
+                    width: "100%",
+                    padding: "8px 12px",
+                    border: "1px solid var(--border)",
+                    borderRadius: 8,
+                    background: "#fff",
+                    cursor: "pointer",
+                    fontSize: 13,
+                    fontWeight: 600,
+                    color: "var(--text-strong)"
+                  }}
+                >
+                  다운로드
+                </button>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* 확대 이미지 모달 */}

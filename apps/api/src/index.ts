@@ -12,6 +12,8 @@ import schedulesRouter from "./routes/schedules.js";
 import testRunsRouter from "./routes/testRuns.js";
 import aiTestSessionsRouter from "./routes/aiTestSessions.js";
 import aiTestResultsRouter from "./routes/aiTestResults.js";
+import manualTestSessionsRouter from "./routes/manualTestSessions.js";
+import manualTestCasesRouter from "./routes/manualTestCases.js";
 
 const app = express();
 const PORT = process.env.PORT ?? 4000;
@@ -31,6 +33,8 @@ app.use("/runs", runsRouter);
 app.use("/test-runs", testRunsRouter);
 app.use("/ai-test-sessions", aiTestSessionsRouter);
 app.use("/ai-test-results", aiTestResultsRouter);
+app.use("/manual-test-sessions", manualTestSessionsRouter);
+app.use("/manual-test-cases", manualTestCasesRouter);
 
 app.use((err: Error, _req: express.Request, res: express.Response) => {
   console.error(err);

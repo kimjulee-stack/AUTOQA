@@ -1,6 +1,6 @@
-import { fetchFromApi, fetchFromApiSafe } from "@/lib/api";
-import type { Project, TestRun } from "@/types";
-import { AiTestTabs } from "@/components/ai-test/ai-test-tabs";
+import { fetchFromApiSafe } from "@/lib/api";
+import type { Project } from "@/types";
+import { QrTestTabs } from "@/components/qr-test/qr-test-tabs";
 
 export const dynamic = "force-dynamic";
 
@@ -34,7 +34,7 @@ function createPlaceholderProject(projectId: string, fallback?: SearchParams): P
     id: projectId,
     name: name || decoded,
     product: product || "제품 미지정",
-    platform: platform || "web",
+    platform: platform || "android",
     bundleId: bundleId || "",
     totalRuns: 0
   };
@@ -42,7 +42,7 @@ function createPlaceholderProject(projectId: string, fallback?: SearchParams): P
 
 async function getProjectById(projectId: string): Promise<Project | null> {
   try {
-    const projects = await fetchFromApi<Project[]>("/projects");
+    const projects = await fetchFromApiSafe<Project[]>("/projects", []);
     return projects.find(p => p.id === projectId) || null;
   } catch (error) {
     console.warn("프로젝트 조회 실패:", error);
@@ -50,7 +50,7 @@ async function getProjectById(projectId: string): Promise<Project | null> {
   }
 }
 
-export default async function AiTestProjectPage({
+export default async function QrTestProjectPage({
   params,
   searchParams
 }: {
@@ -70,7 +70,6 @@ export default async function AiTestProjectPage({
   }
   
   let project: Project | null = null;
-  let runs: TestRun[] = [];
   
   try {
     project = await getProjectById(resolvedParams.projectId);
@@ -78,30 +77,8 @@ export default async function AiTestProjectPage({
     console.warn("프로젝트 조회 실패:", error);
   }
   
-  try {
-    runs = await fetchFromApi<TestRun[]>("/test-runs");
-  } catch (error) {
-    console.warn("테스트 실행 목록 조회 실패:", error);
-  }
-  
   const resolvedProject = project ?? createPlaceholderProject(resolvedParams.projectId, resolvedSearchParams);
   
-  const projectRuns = runs
-    .filter(run => run.projectId === resolvedProject.id)
-    .map(run => ({
-      ...run,
-      steps: run.steps ?? []
-    }));
-
-  const summary = {
-    total: projectRuns.length,
-    successRate: projectRuns.length 
-      ? Math.round((projectRuns.filter(run => run.status === "정상").length / projectRuns.length) * 100)
-      : 0,
-    success: projectRuns.filter(run => run.status === "정상").length,
-    fail: projectRuns.filter(run => run.status !== "정상" && run.status !== "대기").length
-  };
-
   const displayProjectId = (() => {
     try {
       return decodeURIComponent(resolvedParams.projectId);
@@ -113,19 +90,17 @@ export default async function AiTestProjectPage({
   return (
     <>
       <nav style={{ fontSize: 14, color: "var(--text-muted)" }}>
-        AI 테스트 &gt; <span style={{ color: "var(--text-strong)" }}>{resolvedProject.name || displayProjectId}</span>
+        QR 테스트 &gt; <span style={{ color: "var(--text-strong)" }}>{resolvedProject.name || displayProjectId}</span>
       </nav>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 4, marginBottom: 24 }}>
         <div>
           <h1 style={{ fontSize: 28, fontWeight: 800 }}>{resolvedProject.name}</h1>
           <p style={{ color: "var(--text-muted)", marginTop: 4 }}>
-            {resolvedProject.product || "제품 미지정"} · {(resolvedProject.platform || "web").toUpperCase()}
+            {resolvedProject.product || "제품 미지정"} · {(resolvedProject.platform || "android").toUpperCase()}
           </p>
         </div>
       </div>
-      <AiTestTabs
-        project={resolvedProject}
-      />
+      <QrTestTabs project={resolvedProject} />
     </>
   );
 }

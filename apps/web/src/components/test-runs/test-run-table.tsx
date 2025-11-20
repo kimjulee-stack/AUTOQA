@@ -26,6 +26,37 @@ const statusColor: Record<string, string> = {
   대기: "var(--text-muted)"
 };
 
+type TestMenuType = "매뉴얼 테스트" | "시나리오 테스트" | "QR 테스트" | "AI 테스트";
+
+function detectTestMenu(project?: Project): TestMenuType {
+  const nameLower = project?.name?.toLowerCase() ?? "";
+  if (nameLower.includes("ai")) return "AI 테스트";
+  if (nameLower.includes("qr")) return "QR 테스트";
+  if (project?.platform === "web") return "매뉴얼 테스트";
+  return "시나리오 테스트";
+}
+
+function getRunDestination(run: TestRun & { project?: Project }, menu: TestMenuType) {
+  const slug = run.project?.id ?? encodeURIComponent(run.project?.name?.toLowerCase() ?? run.projectId);
+  const query = new URLSearchParams({
+    name: run.project?.name ?? "",
+    product: run.project?.product ?? "",
+    platform: run.project?.platform ?? ""
+  }).toString();
+
+  switch (menu) {
+    case "시나리오 테스트":
+      return `/functional-test/${slug}?${query}`;
+    case "QR 테스트":
+      return `/qr-test/${slug}?${query}`;
+    case "AI 테스트":
+      return `/ai-test/${slug}?${query}`;
+    case "매뉴얼 테스트":
+    default:
+      return `/manual-test`;
+  }
+}
+
 export function TestRunTable({ runs }: { runs: (TestRun & { project?: Project })[] }) {
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
@@ -70,6 +101,7 @@ export function TestRunTable({ runs }: { runs: (TestRun & { project?: Project })
             <th style={{ textAlign: "left", paddingBottom: 8 }}>ID</th>
             <th style={{ textAlign: "left" }}>Test Run</th>
             <th style={{ textAlign: "left" }}>프로젝트</th>
+            <th style={{ textAlign: "left" }}>테스트 메뉴</th>
             <th style={{ textAlign: "left" }}>상태</th>
             <th style={{ textAlign: "left" }}>Device / OS</th>
             <th style={{ textAlign: "left" }}>실행일</th>
@@ -78,11 +110,37 @@ export function TestRunTable({ runs }: { runs: (TestRun & { project?: Project })
           </tr>
         </thead>
         <tbody>
-          {visibleRuns.map(run => (
-            <tr key={run.id} style={{ borderTop: "1px solid var(--border)", fontSize: 14 }}>
-              <td style={{ padding: "12px 0", fontWeight: 600 }}>{run.id}</td>
-              <td>{run.scenarioId}</td>
-              <td>{run.project?.name ?? "-"}</td>
+          {visibleRuns.map(run => {
+            const menuType = detectTestMenu(run.project);
+            const destination = getRunDestination(run, menuType);
+
+            return (
+              <tr
+                key={run.id}
+                onClick={() => router.push(destination)}
+                style={{
+                  borderTop: "1px solid var(--border)",
+                  fontSize: 14,
+                  cursor: "pointer"
+                }}
+              >
+                <td style={{ padding: "12px 0", fontWeight: 600 }}>{run.id}</td>
+                <td>{run.scenarioId}</td>
+                <td>{run.project?.name ?? "-"}</td>
+                <td>
+                  <span
+                    style={{
+                      padding: "4px 10px",
+                      borderRadius: 999,
+                      border: "1px solid var(--border)",
+                      background: "#fff",
+                      fontSize: 12,
+                      fontWeight: 600
+                    }}
+                  >
+                    {menuType}
+                  </span>
+                </td>
               <td>
                 <span
                   style={{
@@ -101,26 +159,30 @@ export function TestRunTable({ runs }: { runs: (TestRun & { project?: Project })
               </td>
               <td>{formatDate(run.startedAt)}</td>
               <td>{run.label ?? "-"}</td>
-              <td>
-                <button
-                  onClick={() => handleDelete(run.id)}
-                  disabled={deletingId === run.id}
-                  style={{
-                    padding: "4px 8px",
-                    fontSize: 12,
-                    border: "1px solid var(--border)",
-                    borderRadius: 6,
-                    background: deletingId === run.id ? "#f6f7fb" : "#fff",
-                    color: deletingId === run.id ? "var(--text-muted)" : "#ef4444",
-                    cursor: deletingId === run.id ? "not-allowed" : "pointer",
-                    fontWeight: 600
-                  }}
-                >
-                  {deletingId === run.id ? "삭제 중..." : "삭제"}
-                </button>
-              </td>
-            </tr>
-          ))}
+                <td>
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      handleDelete(run.id);
+                    }}
+                    disabled={deletingId === run.id}
+                    style={{
+                      padding: "4px 8px",
+                      fontSize: 12,
+                      border: "1px solid var(--border)",
+                      borderRadius: 6,
+                      background: deletingId === run.id ? "#f6f7fb" : "#fff",
+                      color: deletingId === run.id ? "var(--text-muted)" : "#ef4444",
+                      cursor: deletingId === run.id ? "not-allowed" : "pointer",
+                      fontWeight: 600
+                    }}
+                  >
+                    {deletingId === run.id ? "삭제 중..." : "삭제"}
+                  </button>
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
       {runs.length > pageSize && (

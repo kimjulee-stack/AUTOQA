@@ -41,7 +41,7 @@ export function ProjectsPanel({ projects }: { projects: Project[] }) {
     if ((event.target as HTMLElement).closest("button")) {
       return;
     }
-    // 기능 테스트만 상세 페이지로 이동, 나머지는 아무 동작 안 함
+    // 기능 테스트는 상세 페이지로 이동
     if (pathname.startsWith("/functional-test")) {
       const slug = project.id ?? encodeURIComponent(project.name.toLowerCase());
       const query = new URLSearchParams({
@@ -51,6 +51,17 @@ export function ProjectsPanel({ projects }: { projects: Project[] }) {
         bundleId: project.bundleId ?? ""
       });
       router.push(`/functional-test/${slug}?${query.toString()}`);
+    }
+    // QR 테스트는 상세 페이지로 이동
+    if (pathname.startsWith("/qr-test")) {
+      const slug = project.id ?? encodeURIComponent(project.name.toLowerCase());
+      const query = new URLSearchParams({
+        name: project.name,
+        product: project.product,
+        platform: project.platform,
+        bundleId: project.bundleId ?? ""
+      });
+      router.push(`/qr-test/${slug}?${query.toString()}`);
     }
     // AI 테스트는 상세 페이지로 이동
     if (pathname.startsWith("/ai-test")) {
@@ -62,6 +73,17 @@ export function ProjectsPanel({ projects }: { projects: Project[] }) {
         bundleId: project.bundleId ?? ""
       });
       router.push(`/ai-test/${slug}?${query.toString()}`);
+    }
+    // 매뉴얼 테스트는 상세 페이지로 이동
+    if (pathname.startsWith("/manual-test")) {
+      const slug = project.id ?? encodeURIComponent(project.name.toLowerCase());
+      const query = new URLSearchParams({
+        name: project.name,
+        product: project.product,
+        platform: project.platform,
+        bundleId: project.bundleId ?? ""
+      });
+      router.push(`/manual-test/${slug}?${query.toString()}`);
     }
     // UI 테스트, DB 테스트, 성능 테스트는 상세 페이지가 없으므로 클릭해도 동작하지 않음
   };
@@ -130,7 +152,7 @@ export function ProjectsPanel({ projects }: { projects: Project[] }) {
               style={{
                 borderTop: "1px solid var(--border)",
                 fontSize: 14,
-                cursor: pathname.startsWith("/functional-test") || pathname.startsWith("/ai-test") ? "pointer" : "default"
+                cursor: pathname.startsWith("/functional-test") || pathname.startsWith("/ai-test") || pathname.startsWith("/qr-test") ? "pointer" : "default"
               }}
             >
               <td style={{ padding: "12px 0", fontWeight: 600 }}>
