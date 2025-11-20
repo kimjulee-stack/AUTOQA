@@ -12,8 +12,6 @@ async function scanAndroidDevices(): Promise<Device[]> {
     const devices: Device[] = [];
     for (const line of lines) {
       if (!line || line.startsWith("List of devices")) continue;
-      // "device" 키워드가 포함된 라인만 처리 (unauthorized, offline 등 제외)
-      if (!line.includes("device")) continue;
       
       // 공백으로 분리하여 시리얼 번호와 상태 추출
       const parts = line.split(/\s+/);
@@ -22,20 +20,27 @@ async function scanAndroidDevices(): Promise<Device[]> {
       const serial = parts[0];
       const status = parts[1];
       
-      // 상태가 "device"인 경우만 처리 (unauthorized, offline 등 제외)
-      if (status !== "device") continue;
+      // offline 상태는 제외, device와 unauthorized는 포함
+      if (status === "offline") continue;
       
       // 모델명 또는 제품명 추출
       const modelMatch = line.match(/model:(\S+)/);
       const productMatch = line.match(/product:(\S+)/);
       const deviceName = modelMatch?.[1] ?? productMatch?.[1] ?? "Android Device";
       
+      // 상태에 따라 device 상태 설정
+      // unauthorized 상태도 available로 표시 (사용자가 디바이스에서 인증 허용 필요)
+      let deviceStatus: "available" | "in-use" | "offline" = "available";
+      if (status === "offline") {
+        deviceStatus = "offline";
+      }
+      
       devices.push({
         id: `android-${serial}`,
         name: deviceName.replace(/_/g, " "),
         platform: "android",
         osVersion: "Android",
-        status: "available",
+        status: deviceStatus,
         connection: "usb"
       });
     }

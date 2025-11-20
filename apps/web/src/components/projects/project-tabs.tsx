@@ -9,6 +9,11 @@ import type { Project, Scenario, TestRun, TestStep } from "@/types";
 
 type Tab = "테스트 실행" | "실행 결과" | "스케줄";
 
+const normalizePlatform = (p?: string): "android" | "ios" | "web" | undefined => {
+  if (p === "android" || p === "ios" || p === "web") return p;
+  return undefined;
+};
+
 interface ProjectTabsProps {
   projectId: string;
   project: {
@@ -106,7 +111,10 @@ export function ProjectTabs({ projectId, project, scenarios, latestRuns, summary
       {activeTab === "테스트 실행" && (
         <RunWorkspace
           projectId={projectId}
-          project={project}
+          project={{
+            ...project,
+            platform: normalizePlatform(project.platform),
+          }}
           scenarios={scenarios}
           latestRuns={latestRuns}
         />

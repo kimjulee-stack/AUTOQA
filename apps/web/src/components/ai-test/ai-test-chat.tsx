@@ -96,6 +96,56 @@ export function AiTestChat({
     try {
       const response = await fetch(imageUrl);
       const blob = await response.blob();
+      
+      // 이미지 크기 제한 (5MB)
+      if (blob.size > 5 * 1024 * 1024) {
+        console.warn("이미지가 너무 큽니다. 리사이즈합니다...");
+        // Canvas를 사용하여 이미지 리사이즈
+        return new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => {
+            const canvas = document.createElement('canvas');
+            const maxWidth = 1024; // 최대 너비
+            const maxHeight = 1024; // 최대 높이
+            let width = img.width;
+            let height = img.height;
+            
+            // 비율 유지하면서 리사이즈
+            if (width > maxWidth || height > maxHeight) {
+              const ratio = Math.min(maxWidth / width, maxHeight / height);
+              width = width * ratio;
+              height = height * ratio;
+            }
+            
+            canvas.width = width;
+            canvas.height = height;
+            const ctx = canvas.getContext('2d');
+            if (!ctx) {
+              reject(new Error("Canvas context를 가져올 수 없습니다."));
+              return;
+            }
+            ctx.drawImage(img, 0, 0, width, height);
+            
+            canvas.toBlob((blob) => {
+              if (!blob) {
+                reject(new Error("이미지 변환 실패"));
+                return;
+              }
+              const reader = new FileReader();
+              reader.onloadend = () => {
+                const base64String = reader.result as string;
+                const base64 = base64String.split(',')[1];
+                resolve(base64);
+              };
+              reader.onerror = reject;
+              reader.readAsDataURL(blob);
+            }, 'image/jpeg', 0.8); // JPEG로 변환하여 크기 감소
+          };
+          img.onerror = reject;
+          img.src = URL.createObjectURL(blob);
+        });
+      }
+      
       return new Promise((resolve, reject) => {
         const reader = new FileReader();
         reader.onloadend = () => {
@@ -220,11 +270,11 @@ export function AiTestChat({
         errorMsg.toLowerCase().includes("timeout")
       ) {
         userFriendlyMessage =
-          `❌ LLaVA 로컬 서버에 연결할 수 없습니다.\n\n` +
-          `확인 방법:\n` +
-          `1. LM Studio에서 Developer 탭 → Start Local Server가 ON인지 확인하세요.\n` +
-          `2. 모델(llava-1.6 등)이 Load 상태인지 확인하세요.\n` +
-          `3. 서버 포트 (기본 1234)가 변경되었다면 .env의 LM_STUDIO_API_URL을 맞춰주세요.\n\n` +
+          `❌ Gemini API 서버에 연결할 수 없습니다.\n\n` +
+          `확인 사항:\n` +
+          `1. 인터넷 연결을 확인하세요\n` +
+          `2. Gemini API 키가 올바르게 설정되었는지 확인하세요\n` +
+          `3. .env.local 파일에 GEMINI_API_KEY를 추가했는지 확인하세요\n\n` +
           `에러 상세: ${errorMsg}`;
       }
 
@@ -288,7 +338,7 @@ export function AiTestChat({
           background: "#f8f9fa"
         }}
       >
-        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>LLaVA Assistant</h3>
+        <h3 style={{ fontSize: 16, fontWeight: 700, marginBottom: 4 }}>AI Assistant</h3>
         <p style={{ fontSize: 12, color: "var(--text-muted)" }}>AI와 대화하며 테스트를 수행하세요</p>
       </div>
 

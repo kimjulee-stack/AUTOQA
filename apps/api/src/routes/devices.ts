@@ -1,7 +1,7 @@
 import { Router } from "express";
 import { z } from "zod";
 
-import { getDevices } from "../data/store.js";
+import { getUsbDevices } from "../services/deviceScanner.js";
 import { getDeviceApps } from "../services/deviceAppScanner.js";
 import { extractElementAtPoint, getAndroidXmlHierarchy } from "../services/elementExtractor.js";
 import { captureScreenshot } from "../services/screenshotCapture.js";
@@ -11,7 +11,7 @@ const router = Router();
 
 router.get("/", async (req, res) => {
   const { connection } = req.query;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const filtered = devices.filter(device => {
     if (!connection) return true;
     return device.connection === connection;
@@ -22,7 +22,7 @@ router.get("/", async (req, res) => {
 
 router.get("/:deviceId/apps", async (req, res) => {
   const { deviceId } = req.params;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const target = devices.find(device => device.id === deviceId);
   if (!target) {
     return res.status(404).json({ message: "디바이스를 찾을 수 없습니다." });
@@ -38,7 +38,7 @@ router.get("/:deviceId/apps", async (req, res) => {
 
 router.get("/:deviceId/element", async (req, res) => {
   const { deviceId } = req.params;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const target = devices.find(device => device.id === deviceId);
   if (!target) {
     return res.status(404).json({ message: "디바이스를 찾을 수 없습니다." });
@@ -70,7 +70,7 @@ router.get("/:deviceId/element", async (req, res) => {
 
 router.get("/:deviceId/xml", async (req, res) => {
   const { deviceId } = req.params;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const target = devices.find(device => device.id === deviceId);
   if (!target) {
     return res.status(404).json({ message: "디바이스를 찾을 수 없습니다." });
@@ -97,7 +97,7 @@ router.get("/:deviceId/xml", async (req, res) => {
 
 router.post("/:deviceId/screenshot", async (req, res) => {
   const { deviceId } = req.params;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const target = devices.find(device => device.id === deviceId);
   if (!target) {
     return res.status(404).json({ message: "디바이스를 찾을 수 없습니다." });
@@ -123,7 +123,7 @@ router.post("/:deviceId/screenshot", async (req, res) => {
 // AI 제어를 위한 디바이스 액션 엔드포인트
 router.post("/:deviceId/action", async (req, res) => {
   const { deviceId } = req.params;
-  const devices = await getDevices();
+  const devices = await getUsbDevices();
   const target = devices.find(device => device.id === deviceId);
   
   if (!target) {

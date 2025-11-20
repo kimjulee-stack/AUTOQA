@@ -126,10 +126,7 @@ export default async function AiTestProjectPage({
         </p>
       </header>
       <AiTestTabs
-        projectId={resolvedProject.id}
         project={resolvedProject}
-        projectRuns={projectRuns}
-        summary={summary}
       />
     </>
   );

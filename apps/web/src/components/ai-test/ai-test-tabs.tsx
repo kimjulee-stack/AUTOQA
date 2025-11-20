@@ -743,7 +743,7 @@ export function AiTestTabs({ project }: AiTestTabsProps) {
                           {resultMessages.map(message => (
                             <div key={message.id}>
                               <div style={{ fontSize: 12, color: "var(--text-muted)" }}>
-                                {message.role === "assistant" ? "LLaVA" : "사용자"} ·{" "}
+                                {message.role === "assistant" ? "AI" : "사용자"} ·{" "}
                                 {new Date(message.createdAt).toLocaleTimeString("ko-KR", { hour12: false })}
                               </div>
                               <div
