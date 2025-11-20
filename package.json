@@ -1,0 +1,23 @@
+{
+  "name": "apptest-ai",
+  "private": true,
+  "version": "0.1.0",
+  "packageManager": "pnpm@10.22.0",
+  "scripts": {
+    "dev": "concurrently \"pnpm --filter api dev\" \"pnpm --filter web dev\"",
+    "dev:web": "pnpm --filter web dev",
+    "dev:api": "pnpm --filter api dev",
+    "build": "pnpm --recursive build",
+    "lint": "pnpm --recursive lint",
+    "format": "pnpm --recursive format"
+  },
+  "devDependencies": {
+    "appium": "^3.1.1",
+    "concurrently": "^8.2.2"
+  }
+}
+
+
+
+
+
